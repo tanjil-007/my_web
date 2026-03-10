@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KeyTrainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10; --panel: #0d1219; --border: #1a2535;
+    --green: #00e5a0; --red: #ff4466; --yellow: #ffd700;
+    --blue: #4488ff; --dim: #2a3a4a; --text: #c8d8e8; --muted: #4a6070;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 16px; gap: 14px;
+  }
+  h1 {
+    font-family: 'Orbitron', monospace; font-size: 20px; font-weight: 900;
+    letter-spacing: 8px; color: var(--green);
+    text-shadow: 0 0 20px rgba(0,229,160,0.4); margin-top: 6px;
+  }
+  .subtitle { font-size: 11px; letter-spacing: 4px; color: var(--muted); }
+  .setup {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 20px;
+    display: flex; align-items: center; gap: 24px;
+    flex-wrap: wrap; justify-content: center;
+    width: 100%; max-width: 900px;
+  }
+  .setup label { font-size: 10px; letter-spacing: 3px; color: var(--muted); display: block; margin-bottom: 5px; }
+  .speed-control { display: flex; align-items: center; gap: 8px; }
+  input[type=range] {
+    -webkit-appearance: none; width: 130px; height: 4px;
+    background: var(--dim); border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 13px; height: 13px;
+    background: var(--green); border-radius: 50%;
+    cursor: pointer; box-shadow: 0 0 8px var(--green);
+  }
+  .slider-val { font-family: 'Orbitron', monospace; font-size: 16px; color: var(--green); width: 44px; text-align: center; }
+  .kb-section { width: 100%; max-width: 900px; }
+  .kb-section > label { font-size: 10px; letter-spacing: 3px; color: var(--muted); display: block; margin-bottom: 8px; }
+  .kb-wrap {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .kb-row { display: flex; gap: 5px; align-items: center; }
+  .kb-key {
+    height: 42px; min-width: 38px; padding: 0 6px;
+    background: #111820; border: 1px solid var(--dim);
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; cursor: pointer; transition: all 0.12s;
+    user-select: none; color: var(--muted); white-space: nowrap;
+  }
+  .kb-key:hover { border-color: var(--blue); color: var(--blue); }
+  .kb-key.selected { background: rgba(0,229,160,0.08); border-color: var(--green); color: var(--green); }
+  .kb-key.wide-15 { min-width: 54px; }
+  .kb-key.wide-2  { min-width: 72px; }
+  .kb-key.wide-25 { min-width: 88px; }
+  .kb-key.wide-3  { min-width: 104px; }
+  .kb-key.wide-7  { min-width: 240px; }
+  .kb-key.active-target {
+    background: rgba(255,215,0,0.18) !important; border-color: var(--yellow) !important;
+    color: var(--yellow) !important; box-shadow: 0 0 18px rgba(255,215,0,0.45);
+    transform: scale(1.12); z-index: 2;
+  }
+  .kb-key.correct-flash {
+    background: rgba(0,229,160,0.28) !important; border-color: var(--green) !important;
+    color: var(--green) !important; transform: scale(1.08);
+  }
+  .kb-key.wrong-flash {
+    background: rgba(255,68,102,0.22) !important; border-color: var(--red) !important;
+    color: var(--red) !important;
+  }
+  .kb-key.non-selectable { opacity: 0.25; cursor: default; pointer-events: none; }
+  .kb-controls { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+  .btn-sm {
+    padding: 5px 14px; font-size: 10px; letter-spacing: 2px;
+    font-family: 'Orbitron', monospace; cursor: pointer;
+    border-radius: 5px; border: 1px solid var(--green);
+    background: transparent; color: var(--green); transition: all 0.15s;
+  }
+  .btn-sm:hover { background: rgba(0,229,160,0.1); }
+  .game-area {
+    width: 100%; max-width: 900px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .timer-wrap { display: flex; flex-direction: column; gap: 5px; }
+  .timer-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); letter-spacing: 2px; }
+  .timer-bar-bg { height: 7px; background: var(--dim); border-radius: 4px; overflow: hidden; }
+  .timer-bar { height: 100%; background: linear-gradient(90deg, var(--green), var(--yellow)); border-radius: 4px; transition: width 0.09s linear; width: 100%; }
+  .timer-bar.urgent { background: linear-gradient(90deg, var(--red), var(--yellow)); }
+  .target-display { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .target-label { font-size: 10px; letter-spacing: 4px; color: var(--muted); }
+  .target-letter {
+    font-family: 'Orbitron', monospace; font-size: 72px; font-weight: 900;
+    color: var(--yellow); text-shadow: 0 0 30px rgba(255,215,0,0.5);
+    line-height: 1; min-height: 80px; display: flex; align-items: center; justify-content: center;
+    transition: color 0.12s, transform 0.12s;
+  }
+  .target-letter.correct { color: var(--green); text-shadow: 0 0 30px rgba(0,229,160,0.6); transform: scale(1.15); }
+  .target-letter.wrong   { color: var(--red);   text-shadow: 0 0 30px rgba(255,68,102,0.6); transform: scale(0.9); }
+  @keyframes countPop {
+    0%   { transform: scale(1.6); opacity: 0; }
+    30%  { transform: scale(1.0); opacity: 1; }
+    80%  { transform: scale(1.0); opacity: 1; }
+    100% { transform: scale(0.6); opacity: 0; }
+  }
+  .countdown-pop { animation: countPop 0.85s ease forwards; }
+  #typeInput {
+    background: var(--bg); border: 1px solid var(--dim); border-radius: 6px;
+    padding: 11px 16px; color: var(--text); font-family: 'Share Tech Mono', monospace;
+    font-size: 17px; outline: none; text-align: center; letter-spacing: 4px;
+    transition: border-color 0.15s; width: 100%;
+  }
+  #typeInput:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,229,160,0.08); }
+  #typeInput.correct { border-color: var(--green); }
+  #typeInput.wrong   { border-color: var(--red); }
+  .stats-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 16px; text-align: center; min-width: 74px; }
+  .stat-val { font-family: 'Orbitron', monospace; font-size: 20px; color: var(--green); }
+  .stat-lbl { font-size: 9px; letter-spacing: 2px; color: var(--muted); margin-top: 2px; }
+  .btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    padding: 10px 26px; font-family: 'Orbitron', monospace; font-size: 11px;
+    letter-spacing: 3px; border-radius: 6px; cursor: pointer; font-weight: 700;
+    transition: all 0.2s; border: 2px solid;
+  }
+  .btn-green   { background: var(--green); color: var(--bg); border-color: var(--green); }
+  .btn-green:hover { box-shadow: 0 0 20px rgba(0,229,160,0.4); }
+  .btn-outline { background: transparent; color: var(--green); border-color: var(--green); }
+  .btn-outline:hover { background: rgba(0,229,160,0.1); }
+  .results {
+    display: none; width: 100%; max-width: 900px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px; padding: 22px;
+    flex-direction: column; gap: 18px;
+  }
+  .results.show { display: flex; }
+  .results h2 { font-family: 'Orbitron', monospace; font-size: 15px; letter-spacing: 6px; color: var(--green); text-align: center; }
+  .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+  .result-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 13px; text-align: center; }
+  .result-card .val { font-family: 'Orbitron', monospace; font-size: 26px; color: var(--green); }
+  .result-card .lbl { font-size: 9px; letter-spacing: 2px; color: var(--muted); margin-top: 3px; }
+  .fault-title { font-size: 10px; letter-spacing: 3px; color: var(--muted); margin-bottom: 10px; }
+  .fault-list { display: flex; gap: 8px; flex-wrap: wrap; }
+  .fault-item {
+    background: rgba(255,68,102,0.1); border: 1px solid var(--red);
+    border-radius: 6px; padding: 8px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .fault-item .fkey   { font-family: 'Orbitron', monospace; font-size: 18px; color: var(--red); }
+  .fault-item .fcount { font-size: 9px; color: var(--muted); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<h1>KEYTRAINER</h1>
+<p class="subtitle">FULL KEYBOARD TYPING TRAINER</p>
+
+<div class="setup">
+  <div>
+    <label>INTERVAL (seconds)</label>
+    <div class="speed-control">
+      <span style="font-size:10px;color:var(--muted)">1s</span>
+      <input type="range" id="speedSlider" min="1" max="10" value="2" step="1">
+      <span style="font-size:10px;color:var(--muted)">10s</span>
+      <span class="slider-val" id="speedVal">2s</span>
+    </div>
+  </div>
+  <div>
+    <label>ROUNDS</label>
+    <div class="speed-control">
+      <span style="font-size:10px;color:var(--muted)">10</span>
+      <input type="range" id="roundsSlider" min="10" max="200" value="10" step="10">
+      <span style="font-size:10px;color:var(--muted)">200</span>
+      <span class="slider-val" id="roundsVal">10</span>
+    </div>
+  </div>
+</div>
+
+<div class="kb-section">
+  <label>CLICK KEYS TO INCLUDE IN PRACTICE</label>
+  <div class="kb-wrap" id="keyboard"></div>
+  <div class="kb-controls">
+    <button class="btn-sm" onclick="selectAll()">ALL</button>
+    <button class="btn-sm" onclick="clearAll()">NONE</button>
+    <button class="btn-sm" onclick="selectGroup('letters')">LETTERS</button>
+    <button class="btn-sm" onclick="selectGroup('numbers')">NUMBERS</button>
+    <button class="btn-sm" onclick="selectGroup('symbols')">SYMBOLS</button>
+    <span style="font-size:10px;color:var(--muted);margin-left:6px;" id="selectedCount">0 selected</span>
+  </div>
+</div>
+
+<div class="game-area">
+  <div class="timer-wrap">
+    <div class="timer-label"><span>TIMER</span><span id="timerText">--</span></div>
+    <div class="timer-bar-bg"><div class="timer-bar" id="timerBar"></div></div>
+  </div>
+  <div class="target-display">
+    <div class="target-label" id="targetLabel">PRESS THIS KEY</div>
+    <div class="target-letter" id="targetLetter">?</div>
+  </div>
+  <input type="text" id="typeInput" placeholder="type here..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-val" id="statScore">0</div><div class="stat-lbl">CORRECT</div></div>
+    <div class="stat-box"><div class="stat-val" id="statRound">0</div><div class="stat-lbl">ROUND</div></div>
+    <div class="stat-box"><div class="stat-val" id="statTotal">0</div><div class="stat-lbl">TOTAL</div></div>
+    <div class="stat-box"><div class="stat-val" id="statAcc">--%</div><div class="stat-lbl">ACCURACY</div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-green" id="startBtn" onclick="startGame()">START</button>
+    <button class="btn btn-outline hidden" id="stopBtn" onclick="stopGame()">STOP</button>
+  </div>
+</div>
+
+<div class="results" id="results">
+  <h2>SESSION COMPLETE</h2>
+  <div class="result-grid">
+    <div class="result-card"><div class="val" id="rScore">0</div><div class="lbl">CORRECT</div></div>
+    <div class="result-card"><div class="val" id="rTotal">0</div><div class="lbl">TOTAL</div></div>
+    <div class="result-card"><div class="val" id="rAcc">0%</div><div class="lbl">ACCURACY</div></div>
+    <div class="result-card"><div class="val" id="rMiss">0</div><div class="lbl">MISSED</div></div>
+  </div>
+  <div>
+    <div class="fault-title">MOST FREQUENT MISTAKES</div>
+    <div class="fault-list" id="faultList"></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-green" onclick="resetGame()">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+const KEYBOARD_LAYOUT = [
+  [
+    {l:'Esc',v:'Escape',w:'wide-15',s:false},
+    {l:'F1',v:'F1',w:'',s:false},{l:'F2',v:'F2',w:'',s:false},{l:'F3',v:'F3',w:'',s:false},{l:'F4',v:'F4',w:'',s:false},
+    {l:'F5',v:'F5',w:'',s:false},{l:'F6',v:'F6',w:'',s:false},{l:'F7',v:'F7',w:'',s:false},{l:'F8',v:'F8',w:'',s:false},
+    {l:'F9',v:'F9',w:'',s:false},{l:'F10',v:'F10',w:'',s:false},{l:'F11',v:'F11',w:'',s:false},{l:'F12',v:'F12',w:'',s:false},
+  ],
+  [
+    {l:'`',v:'`',w:'',s:true},{l:'1',v:'1',w:'',s:true},{l:'2',v:'2',w:'',s:true},{l:'3',v:'3',w:'',s:true},
+    {l:'4',v:'4',w:'',s:true},{l:'5',v:'5',w:'',s:true},{l:'6',v:'6',w:'',s:true},{l:'7',v:'7',w:'',s:true},
+    {l:'8',v:'8',w:'',s:true},{l:'9',v:'9',w:'',s:true},{l:'0',v:'0',w:'',s:true},
+    {l:'-',v:'-',w:'',s:true},{l:'=',v:'=',w:'',s:true},{l:'⌫',v:'Backspace',w:'wide-25',s:false},
+  ],
+  [
+    {l:'Tab',v:'Tab',w:'wide-15',s:false},
+    {l:'Q',v:'q',w:'',s:true},{l:'W',v:'w',w:'',s:true},{l:'E',v:'e',w:'',s:true},{l:'R',v:'r',w:'',s:true},
+    {l:'T',v:'t',w:'',s:true},{l:'Y',v:'y',w:'',s:true},{l:'U',v:'u',w:'',s:true},{l:'I',v:'i',w:'',s:true},
+    {l:'O',v:'o',w:'',s:true},{l:'P',v:'p',w:'',s:true},
+    {l:'[',v:'[',w:'',s:true},{l:']',v:']',w:'',s:true},{l:'\\',v:'\\',w:'wide-15',s:true},
+  ],
+  [
+    {l:'Caps',v:'CapsLock',w:'wide-2',s:false},
+    {l:'A',v:'a',w:'',s:true},{l:'S',v:'s',w:'',s:true},{l:'D',v:'d',w:'',s:true},{l:'F',v:'f',w:'',s:true},
+    {l:'G',v:'g',w:'',s:true},{l:'H',v:'h',w:'',s:true},{l:'J',v:'j',w:'',s:true},{l:'K',v:'k',w:'',s:true},
+    {l:'L',v:'l',w:'',s:true},{l:';',v:';',w:'',s:true},{l:"'",v:"'",w:'',s:true},
+    {l:'Enter',v:'Enter',w:'wide-25',s:false},
+  ],
+  [
+    {l:'Shift',v:'ShiftL',w:'wide-3',s:false},
+    {l:'Z',v:'z',w:'',s:true},{l:'X',v:'x',w:'',s:true},{l:'C',v:'c',w:'',s:true},{l:'V',v:'v',w:'',s:true},
+    {l:'B',v:'b',w:'',s:true},{l:'N',v:'n',w:'',s:true},{l:'M',v:'m',w:'',s:true},
+    {l:',',v:',',w:'',s:true},{l:'.',v:'.',w:'',s:true},{l:'/',v:'/',w:'',s:true},
+    {l:'Shift',v:'ShiftR',w:'wide-3',s:false},
+  ],
+  [
+    {l:'Ctrl',v:'CtrlL',w:'wide-15',s:false},{l:'Alt',v:'AltL',w:'wide-15',s:false},
+    {l:'Space',v:' ',w:'wide-7',s:true},
+    {l:'Alt',v:'AltR',w:'wide-15',s:false},{l:'Ctrl',v:'CtrlR',w:'wide-15',s:false},
+  ]
+];
+
+const SELECTABLE = [];
+KEYBOARD_LAYOUT.forEach(row => row.forEach(k => { if (k.s) SELECTABLE.push(k.v); }));
+const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
+const NUMBERS = '1234567890'.split('');
+const SYMBOLS = ['`','-','=','[',']','\\',';',"'",',','.','/',' '];
+
+let selectedKeys  = new Set(SELECTABLE);
+let shuffleBag    = [];
+let timerID       = null;
+let timerLock     = false;
+let timeLeft      = 0;
+let intervalSec   = 2;
+let gameRunning   = false;
+let currentTarget = null;
+let score = 0, totalAttempts = 0, roundsDone = 0, maxRounds = 10;
+let faultMap = {};
+
+// ── BUILD KEYBOARD ────────────────────────────────────────────────────────────
+const kbDiv = document.getElementById('keyboard');
+KEYBOARD_LAYOUT.forEach(row => {
+  const rowDiv = document.createElement('div');
+  rowDiv.className = 'kb-row';
+  row.forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'kb-key' + (k.w ? ' '+k.w : '') + (k.s ? ' selected' : ' non-selectable');
+    el.id = 'key-' + k.v;
+    el.textContent = k.l;
+    if (k.s) el.onclick = () => toggleKey(k.v);
+    rowDiv.appendChild(el);
+  });
+  kbDiv.appendChild(rowDiv);
+});
+updateSelectedCount();
+
+// ── SLIDERS ───────────────────────────────────────────────────────────────────
+document.getElementById('speedSlider').oninput = function() {
+  intervalSec = +this.value;
+  document.getElementById('speedVal').textContent = this.value + 's';
+};
+document.getElementById('roundsSlider').oninput = function() {
+  maxRounds = +this.value;
+  document.getElementById('roundsVal').textContent = this.value;
+};
+
+// ── KEY SELECTION ─────────────────────────────────────────────────────────────
+function toggleKey(v) {
+  if (gameRunning) return;
+  const el = document.getElementById('key-' + v);
+  if (selectedKeys.has(v)) { selectedKeys.delete(v); el.classList.remove('selected'); }
+  else { selectedKeys.add(v); el.classList.add('selected'); }
+  updateSelectedCount();
+}
+function selectAll()  { SELECTABLE.forEach(v => { selectedKeys.add(v); document.getElementById('key-'+v).classList.add('selected'); }); updateSelectedCount(); }
+function clearAll()   { SELECTABLE.forEach(v => { selectedKeys.delete(v); document.getElementById('key-'+v).classList.remove('selected'); }); updateSelectedCount(); }
+function selectGroup(type) {
+  clearAll();
+  const keys = type==='letters' ? LETTERS : type==='numbers' ? NUMBERS : SYMBOLS;
+  keys.forEach(v => { if (SELECTABLE.includes(v)) { selectedKeys.add(v); document.getElementById('key-'+v)?.classList.add('selected'); } });
+  updateSelectedCount();
+}
+function updateSelectedCount() { document.getElementById('selectedCount').textContent = selectedKeys.size + ' selected'; }
+
+// ── SHUFFLE BAG ───────────────────────────────────────────────────────────────
+function refillBag() {
+  shuffleBag = [...selectedKeys];
+  for (let i = shuffleBag.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffleBag[i], shuffleBag[j]] = [shuffleBag[j], shuffleBag[i]];
+  }
+}
+function pickFromBag() {
+  if (shuffleBag.length === 0) refillBag();
+  return shuffleBag.pop();
+}
+
+// ── DISPLAY HELPER ────────────────────────────────────────────────────────────
+function displayKey(v) {
+  if (v === ' ') return 'SPACE';
+  if (v >= 'a' && v <= 'z') return v.toUpperCase();
+  return v;
+}
+
+// ── COUNTDOWN ─────────────────────────────────────────────────────────────────
+function runCountdown(callback) {
+  const el    = document.getElementById('targetLetter');
+  const label = document.getElementById('targetLabel');
+  const counts = ['3','2','1','GO!'];
+  const colors = ['#ff4466','#ffd700','#00e5a0','#00e5a0'];
+  let i = 0;
+  label.textContent = 'GET READY';
+  function showNext() {
+    if (i >= counts.length) { label.textContent = 'PRESS THIS KEY'; callback(); return; }
+    el.style.transition = 'none';
+    el.style.color      = colors[i];
+    el.style.textShadow = `0 0 30px ${colors[i]}88`;
+    el.textContent      = counts[i];
+    el.classList.remove('countdown-pop');
+    void el.offsetWidth;
+    el.classList.add('countdown-pop');
+    i++;
+    setTimeout(showNext, 900);
+  }
+  showNext();
+}
+
+// ── TIMER ─────────────────────────────────────────────────────────────────────
+function killTimer() { if (timerID !== null) { clearInterval(timerID); timerID = null; } }
+
+function startTimer() {
+  killTimer();
+  timeLeft = intervalSec * 10;
+  renderTimerBar();
+  timerID = setInterval(() => {
+    timeLeft--;
+    renderTimerBar();
+    if (timeLeft <= 0) { killTimer(); onTimeUp(); }
+  }, 100);
+}
+
+function renderTimerBar() {
+  const pct = Math.max(0, (timeLeft / (intervalSec * 10)) * 100);
+  const bar = document.getElementById('timerBar');
+  bar.style.width = pct + '%';
+  bar.classList.toggle('urgent', pct < 30);
+  document.getElementById('timerText').textContent = (timeLeft / 10).toFixed(1) + 's';
+}
+
+function onTimeUp() {
+  if (!gameRunning || timerLock) return;
+  timerLock = true;
+  totalAttempts++;
+  faultMap[currentTarget] = (faultMap[currentTarget] || 0) + 1;
+  roundsDone++;
+  flashTarget('wrong');
+  updateStats();
+  if (roundsDone >= maxRounds) { timerLock = false; endGame(); return; }
+  setTimeout(() => { timerLock = false; nextRound(); }, 400);
+}
+
+// ── INPUT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if (!gameRunning || !currentTarget || timerLock) return;
+  if (['Control','Alt','Shift','Meta','CapsLock'].includes(e.key)) return;
+  e.preventDefault();
+  handleInput(e.key);
+});
+
+const input = document.getElementById('typeInput');
+input.addEventListener('input', function() {
+  if (!gameRunning || !currentTarget || timerLock) return;
+  const ch = this.value.slice(-1); this.value = '';
+  if (ch) handleInput(ch);
+});
+
+function handleInput(ch) {
+  if (timerLock) return;
+  const match = ch === currentTarget || ch.toLowerCase() === currentTarget;
+  if (match) {
+    timerLock = true; killTimer();
+    score++; totalAttempts++; roundsDone++;
+    flashTarget('correct'); flashKey(currentTarget, 'correct-flash');
+    input.classList.add('correct'); setTimeout(() => input.classList.remove('correct'), 250);
+    updateStats();
+    if (roundsDone >= maxRounds) { timerLock = false; endGame(); return; }
+    setTimeout(() => { timerLock = false; nextRound(); }, 400);
+  } else {
+    killTimer();
+    totalAttempts++;
+    faultMap[currentTarget] = (faultMap[currentTarget] || 0) + 1;
+    flashTarget('wrong'); flashKey(ch, 'wrong-flash');
+    input.classList.add('wrong'); setTimeout(() => input.classList.remove('wrong'), 250);
+    updateStats(); startTimer();
+  }
+}
+
+// ── GAME FLOW ─────────────────────────────────────────────────────────────────
+function startGame() {
+  if (selectedKeys.size === 0) { alert('Select at least 1 key!'); return; }
+  score = 0; totalAttempts = 0; roundsDone = 0; faultMap = {};
+  intervalSec = +document.getElementById('speedSlider').value;
+  maxRounds   = +document.getElementById('roundsSlider').value;
+  document.getElementById('startBtn').classList.add('hidden');
+  document.getElementById('stopBtn').classList.remove('hidden');
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('timerBar').style.width = '100%';
+  document.getElementById('timerText').textContent = '--';
+  input.disabled = true;
+  updateStats();
+  refillBag();
+  runCountdown(() => {
+    gameRunning = true; timerLock = false;
+    input.disabled = false; input.focus();
+    nextRound();
+  });
+}
+
+function nextRound() {
+  if (!gameRunning) return;
+  currentTarget = pickFromBag();
+  const el = document.getElementById('targetLetter');
+  el.classList.remove('countdown-pop');
+  el.style.color      = 'var(--yellow)';
+  el.style.textShadow = '0 0 30px rgba(255,215,0,0.5)';
+  el.textContent = displayKey(currentTarget);
+  SELECTABLE.forEach(v => document.getElementById('key-'+v)?.classList.remove('active-target'));
+  document.getElementById('key-' + currentTarget)?.classList.add('active-target');
+  startTimer();
+}
+
+function stopGame() { killTimer(); timerLock = false; gameRunning = false; endGame(); }
+
+function endGame() {
+  killTimer(); gameRunning = false; timerLock = false; currentTarget = null;
+  input.disabled = true;
+  SELECTABLE.forEach(v => document.getElementById('key-'+v)?.classList.remove('active-target'));
+  const el = document.getElementById('targetLetter');
+  el.style.color = 'var(--green)'; el.textContent = '✓';
+  document.getElementById('targetLabel').textContent = 'PRESS THIS KEY';
+  document.getElementById('startBtn').classList.remove('hidden');
+  document.getElementById('stopBtn').classList.add('hidden');
+  document.getElementById('timerBar').style.width = '100%';
+  document.getElementById('timerText').textContent = '--';
+
+  const acc = totalAttempts > 0 ? Math.round((score / totalAttempts) * 100) : 0;
+  document.getElementById('rScore').textContent = score;
+  document.getElementById('rTotal').textContent = totalAttempts;
+  document.getElementById('rAcc').textContent = acc + '%';
+  document.getElementById('rMiss').textContent = totalAttempts - score;
+
+  const faultEl = document.getElementById('faultList');
+  const sorted = Object.entries(faultMap).sort((a,b) => b[1]-a[1]);
+  faultEl.innerHTML = sorted.length === 0
+    ? '<span style="color:var(--green);font-size:13px;">🎉 Perfect session! No mistakes.</span>'
+    : sorted.map(([k,c]) => `<div class="fault-item"><div class="fkey">${displayKey(k)}</div><div class="fcount">${c}x</div></div>`).join('');
+
+  document.getElementById('results').classList.add('show');
+}
+
+function resetGame() {
+  document.getElementById('results').classList.remove('show');
+  const el = document.getElementById('targetLetter');
+  el.style.color = 'var(--yellow)'; el.textContent = '?';
+  document.getElementById('timerBar').style.width = '100%';
+  document.getElementById('timerText').textContent = '--';
+  score = 0; totalAttempts = 0; roundsDone = 0; faultMap = {};
+  updateStats(); input.disabled = true; input.value = '';
+}
+
+function flashTarget(type) {
+  const el = document.getElementById('targetLetter');
+  el.style.color = '';
+  el.style.textShadow = '';
+  el.classList.add(type);
+  setTimeout(() => {
+    el.classList.remove(type);
+    el.style.color = 'var(--yellow)';
+    el.style.textShadow = '0 0 30px rgba(255,215,0,0.5)';
+  }, 280);
+}
+function flashKey(v, cls) {
+  const el = document.getElementById('key-' + v); if (!el) return;
+  el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 280);
+}
+function updateStats() {
+  document.getElementById('statScore').textContent = score;
+  document.getElementById('statRound').textContent = roundsDone;
+  document.getElementById('statTotal').textContent = maxRounds;
+  const acc = totalAttempts > 0 ? Math.round((score / totalAttempts) * 100) : 0;
+  document.getElementById('statAcc').textContent = acc + '%';
+}
+</script>
+</body>
+</html>
